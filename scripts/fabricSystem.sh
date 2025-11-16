@@ -84,33 +84,33 @@ function show_help() {
     echo -e "${YELLOW}metadata-upload:${NC}"
     echo "  This command calls connectionFile.sh to create the chaincode package."
     echo "  No parameters required - connectionFile.sh has all values configured."
-    echo "  Output: chaincode.tgz containing metadata.json and code.tar.gz (which contains connection.json)."
+    echo "  Output: ../generated_resources/chaincode.tgz containing metadata.json and code.tar.gz (which contains connection.json)."
     echo
     echo -e "Example:"
     echo "  $0 metadata-upload"
     echo
     echo -e "${YELLOW}install-chaincode-metadata options:${NC}"
     echo "  --chaincodeLabel       Chaincode label (e.g., asset_1.0)"
-    echo "  --chaincodePath        Path to chaincode package (default: ./chaincode.tgz)"
+    echo "  --chaincodePath        Path to chaincode package (default: ../generated_resources/chaincode.tgz)"
     echo "  --orgName              Comma-separated list of organizations (e.g., org1,org2)"
-    echo "  --configFile           Network config file (default: network-config.yaml)"
+    echo "  --configFile           Network config file (default: ../generated_resources/network-config.yaml)"
     echo
     echo -e "${YELLOW}Note:${NC}"
     echo "  This installs the metadata package created by 'metadata-upload' command."
-    echo "  The package should be chaincode.tgz containing metadata.json and connection.json."
+    echo "  The package (../generated_resources/chaincode.tgz) contains metadata.json and connection.json."
     echo
     echo -e "Example:"
     echo "  $0 install-chaincode-metadata --chaincodeLabel asset_1.0 --orgName org1"
-    echo "  $0 install-chaincode-metadata --chaincodeLabel asset_1.0 --chaincodePath ./chaincode.tgz --orgName org1,org2 --configFile network-config.yaml"
+    echo "  $0 install-chaincode-metadata --chaincodeLabel asset_1.0 --chaincodePath ../generated_resources/chaincode.tgz --orgName org1,org2 --configFile ../generated_resources/network-config.yaml"
     echo
     echo -e "${YELLOW}deploy-chaincode options:${NC}"
     echo "  --chaincodeName        Name of the chaincode (e.g., asset)"
     echo "  --imageName            Docker image name (e.g., kfsoftware/chaincode-external)"
-    echo "  --configFile           Network config file (default: network-config.yaml)"
+    echo "  --configFile           Network config file (default: ../generated_resources/network-config.yaml)"
     echo
     echo -e "Example:"
     echo "  export CHAINCODE_NAME=asset"
-    echo "  $0 deploy-chaincode --chaincodeName asset --imageName kfsoftware/chaincode-external --configFile network-config.yaml"
+    echo "  $0 deploy-chaincode --chaincodeName asset --imageName kfsoftware/chaincode-external --configFile ../generated_resources/network-config.yaml"
     echo
     echo -e "${YELLOW}approve-chaincode options:${NC}"
     echo "  --chaincodeName        Name of the chaincode (e.g., asset)"
@@ -118,11 +118,11 @@ function show_help() {
     echo "  --sequence             Sequence number (e.g., 1)"
     echo "  --channelName          Channel name (e.g., demo)"
     echo "  --orgName              Comma-separated list of organizations (e.g., org1,org2)"
-    echo "  --configFile           Network config file (default: network-config.yaml)"
+    echo "  --configFile           Network config file (default: ../generated_resources/network-config.yaml)"
     echo
     echo -e "Example:"
     echo "  export CHAINCODE_NAME=asset"
-    echo "  $0 approve-chaincode --chaincodeName asset --version 1.0 --sequence 1 --channelName demo --orgName org1,org2 --configFile network-config.yaml"
+    echo "  $0 approve-chaincode --chaincodeName asset --version 1.0 --sequence 1 --channelName demo --orgName org1,org2 --configFile ../generated_resources/network-config.yaml"
     echo
     echo -e "${YELLOW}commit-chaincode options:${NC}"
     echo "  --chaincodeName        Name of the chaincode (e.g., asset)"
@@ -130,11 +130,11 @@ function show_help() {
     echo "  --sequence             Sequence number (e.g., 1)"
     echo "  --channelName          Channel name (e.g., demo)"
     echo "  --orgName              Comma-separated list of organizations (e.g., org1,org2)"
-    echo "  --configFile           Network config file (default: network-config.yaml)"
+    echo "  --configFile           Network config file (default: ../generated_resources/network-config.yaml)"
     echo
     echo -e "Example:"
     echo "  export CHAINCODE_NAME=asset"
-    echo "  $0 commit-chaincode --chaincodeName asset --version 1.0 --sequence 1 --channelName demo --orgName org1,org2 --configFile network-config.yaml"
+    echo "  $0 commit-chaincode --chaincodeName asset --version 1.0 --sequence 1 --channelName demo --orgName org1,org2 --configFile ../generated_resources/network-config.yaml"
     echo -e "${NC}"
     exit 1
 }
@@ -497,7 +497,7 @@ function create_identities_and_network_config() {
     fi
     echo -e "${GREEN}✓ Network configuration generated successfully${NC}"
     echo
-    kubectl get secret network-cp -o jsonpath="{.data.config\.yaml}" | base64 --decode > network-config.yaml
+    kubectl get secret network-cp -o jsonpath="{.data.config\.yaml}" | base64 --decode > ../generated_resources/network-config.yaml
     # Summary
     echo -e "${GREEN}========================================${NC}"
     echo -e "${GREEN}Identities and Network Config Completed!${NC}"
@@ -538,7 +538,7 @@ function metadata_upload() {
     echo -e "${GREEN}========================================${NC}"
     echo -e "${GREEN}Chaincode Package Created Successfully!${NC}"
     echo -e "${GREEN}========================================${NC}"
-    echo -e "${GREEN}Output: chaincode.tgz${NC}"
+    echo -e "${GREEN}Output: ../generated_resources/chaincode.tgz${NC}"
     echo -e "${GREEN}========================================${NC}"
     echo
     echo -e "${YELLOW}Next steps:${NC}"
@@ -966,8 +966,8 @@ elif [ "$subcommand" == "install-chaincode-metadata" ]; then
     fi
     
     # Set defaults
-    configFile="network-config.yaml"
-    chaincodePath="./chaincode.tgz"
+    configFile="../generated_resources/network-config.yaml"
+    chaincodePath="../generated_resources/chaincode.tgz"
     
     while [[ "$#" -gt 0 ]]; do
         case $1 in
@@ -997,7 +997,7 @@ elif [ "$subcommand" == "deploy-chaincode" ]; then
     fi
     
     # Set default config file
-    configFile="network-config.yaml"
+    configFile="../generated_resources/network-config.yaml"
     
     while [[ "$#" -gt 0 ]]; do
         case $1 in
@@ -1026,7 +1026,7 @@ elif [ "$subcommand" == "approve-chaincode" ]; then
     fi
     
     # Set default config file
-    configFile="network-config.yaml"
+    configFile="../generated_resources/network-config.yaml"
     
     while [[ "$#" -gt 0 ]]; do
         case $1 in
@@ -1058,7 +1058,7 @@ elif [ "$subcommand" == "commit-chaincode" ]; then
     fi
     
     # Set default config file
-    configFile="network-config.yaml"
+    configFile="../generated_resources/network-config.yaml"
     
     while [[ "$#" -gt 0 ]]; do
         case $1 in

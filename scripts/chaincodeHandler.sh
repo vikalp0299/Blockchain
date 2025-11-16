@@ -148,7 +148,7 @@ function create_connection_file() {
         echo -e "${GREEN}========================================${NC}"
         echo
         echo -e "${YELLOW}To save connection profile to file:${NC}"
-        echo -e "${YELLOW}kubectl get secret ${connectionSecret} -o jsonpath=\"{.data.config\\.yaml}\" | base64 --decode > network-config.yaml${NC}"
+        echo -e "${YELLOW}kubectl get secret ${connectionSecret} -o jsonpath=\"{.data.config\\.yaml}\" | base64 --decode > ../generated_resources/network-config.yaml${NC}"
     else
         echo -e "${RED}Failed to create connection profile${NC}"
         exit 1

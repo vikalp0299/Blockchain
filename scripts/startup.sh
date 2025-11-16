@@ -21,9 +21,9 @@ fi
 
 # Start the application
 echo -e "${GREEN}Starting the application...${NC}"
-echo -e "${YELLOW}Command: kind create cluster --config=kind-config.yaml${NC}"
+echo -e "${YELLOW}Command: kind create cluster --config=../setup/kind-config.yaml${NC}"
 
-output=$(kind create cluster --config=kind-config.yaml & wait)
+output=$(kind create cluster --config=../setup/kind-config.yaml & wait)
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}Cluster created successfully.${NC}"
@@ -33,9 +33,9 @@ fi
 
 
 #Setting Istio binaries on the machine
-echo -e "${GREEN}Setting Istio binaries on the machine...${NC}"
-echo -e "${YELLOW}Command: curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.20.0 sh -${NC}"
-#output=$(curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.20.0 sh - & wait) 
+echo -e "${GREEN}Setting Istio binaries path...${NC}"
+export PATH="$PATH:$PWD/../istio-1.20.0/bin"
+echo -e "${GREEN}Istio binaries path set to: $PWD/../istio-1.20.0/bin${NC}"
 
 
 #Installing Istio on the cluster
@@ -55,9 +55,9 @@ if [ $? -eq 0 ]; then
 else
     echo -e "${RED}Failed to initialize Istio operator.${NC}"
 fi
-echo -e "${YELLOW}Command: kubectl apply -f istio-operator.yaml${NC}"
+echo -e "${YELLOW}Command: kubectl apply -f ../setup/istio-operator.yaml${NC}"
 
-output=$(kubectl apply -f istio-operator.yaml & wait)
+output=$(kubectl apply -f ../setup/istio-operator.yaml & wait)
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}Istio operator applied successfully.${NC}"
 else
@@ -66,8 +66,8 @@ fi
 
 for i in {1..2}; do
     echo "Configuring internal DNS... Attempt $i"
-    echo -e "${YELLOW}Command: kubectl apply -f istio-dns.yaml${NC}"
-    output=$(kubectl apply -f istio-dns.yaml & wait)
+    echo -e "${YELLOW}Command: kubectl apply -f ../setup/istio-dns.yaml${NC}"
+    output=$(kubectl apply -f ../setup/istio-dns.yaml & wait)
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}Internal DNS configured successfully on attempt $i.${NC}"
     else

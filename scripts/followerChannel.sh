@@ -102,8 +102,11 @@ ${tls_cert}
       url: grpcs://${ordererNodeName}.default:7050
 "
     
+    # Ensure generated_resources directory exists
+    mkdir -p ../generated_resources
+    
     # Generate FabricFollowerChannel YAML
-    cat > follower-channel.yaml <<EOF
+    cat > ../generated_resources/follower-channel.yaml <<EOF
 ---
 apiVersion: hlf.kungfusoftware.es/v1alpha1
 kind: FabricFollowerChannel
@@ -126,14 +129,14 @@ ${peers_to_join_yaml}
 EOF
     
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}Follower Channel YAML written to follower-channel.yaml successfully.${NC}"
+        echo -e "${GREEN}Follower Channel YAML written to ../generated_resources/follower-channel.yaml successfully.${NC}"
         
         if [ "$dryRun" == "true" ]; then
             echo -e "${YELLOW}Dry run mode: Skipping kubectl apply${NC}"
-            echo -e "${GREEN}✓ YAML file generated: follower-channel.yaml${NC}"
+            echo -e "${GREEN}✓ YAML file generated: ../generated_resources/follower-channel.yaml${NC}"
         else
-            echo -e "${YELLOW}Applying follower channel configuration...${NC}"
-            kubectl apply -f follower-channel.yaml
+            echo -e "${GREEN}Applying follower channel configuration...${NC}"
+            kubectl apply -f ../generated_resources/follower-channel.yaml
             if [ $? -eq 0 ]; then
                 echo -e "${GREEN}✓ Follower channel configuration applied successfully for ${orgName}${NC}"
             else
@@ -142,7 +145,7 @@ EOF
             fi
         fi
     else
-        echo -e "${RED}Failed to write follower channel YAML to follower-channel.yaml.${NC}"
+        echo -e "${RED}Failed to write follower channel YAML to ../generated_resources/follower-channel.yaml.${NC}"
         exit 1
     fi
 }

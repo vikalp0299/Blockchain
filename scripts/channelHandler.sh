@@ -117,8 +117,11 @@ ${sign_cert}
 "
     done
     
-    # Generate the YAML and write to channel.yaml
-    cat > channel.yaml <<EOF
+    # Ensure generated_resources directory exists
+    mkdir -p ../generated_resources
+    
+    # Generate the YAML and write to ../generated_resources/channel.yaml
+    cat > ../generated_resources/channel.yaml <<EOF
 apiVersion: hlf.kungfusoftware.es/v1alpha1
 kind: FabricMainChannel
 metadata:
@@ -198,10 +201,10 @@ ${orderers_yaml}
 EOF
 
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}Channel YAML written to channel.yaml successfully.${NC}"
+        echo -e "${GREEN}Channel YAML written to ../generated_resources/channel.yaml successfully.${NC}"
         echo -e "${YELLOW}Applying channel configuration...${NC}"
-        cat channel.yaml
-        kubectl apply -f channel.yaml
+        cat ../generated_resources/channel.yaml
+        kubectl apply -f ../generated_resources/channel.yaml
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}✓ Channel configuration applied successfully${NC}"
         else
@@ -209,7 +212,7 @@ EOF
             exit 1
         fi
     else
-        echo -e "${RED}Failed to write channel YAML to channel.yaml.${NC}"
+        echo -e "${RED}Failed to write channel YAML to ../generated_resources/channel.yaml.${NC}"
         exit 1
     fi
 }
