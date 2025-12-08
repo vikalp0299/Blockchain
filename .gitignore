@@ -5,3 +5,5 @@ code.tar.gz
 connection.json
 metadata.json
 org1.yaml
+istio-1.20.0/
+generated_resources/
