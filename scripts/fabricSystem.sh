@@ -26,6 +26,13 @@ function show_help() {
     echo "  deploy-chaincode                       Deploy external chaincode container and sync"
     echo "  approve-chaincode           Approve chaincode for organizations"
     echo "  commit-chaincode            Commit chaincode to channel"
+    echo "  init-ledger                 Initialize ledger with sample data"
+    echo "  get-all-files               Query all files from the ledger"
+    echo "  create-file                 Create a new file entry in the ledger"
+    echo "  propose-edit                Propose an edit to an existing file"
+    echo "  approve-edit                Approve a pending edit proposal"
+    echo "  reject-edit                 Reject a pending edit proposal"
+    echo "  extra-user                  Create blockchain identity for a new user"
     echo
     echo -e "${YELLOW}create-system-org options:${NC}"
     echo "  --orgName           Comma-separated list of peer organizations (e.g., org1 or org1,org2,org3)"
@@ -135,6 +142,74 @@ function show_help() {
     echo -e "Example:"
     echo "  export CHAINCODE_NAME=asset"
     echo "  $0 commit-chaincode --chaincodeName asset --version 1.0 --sequence 1 --channelName demo --orgName org1,org2 --configFile ../generated_resources/network-config.yaml"
+    echo
+    echo -e "${YELLOW}init-ledger options:${NC}"
+    echo "  --configFile           Network config file (default: ../generated_resources/network-config.yaml)"
+    echo "  --orgName              Organization admin name (e.g., org1-admin-default)"
+    echo "  --peerName             Peer name (e.g., org1-peer0.default)"
+    echo "  --channelName          Channel name (e.g., demo)"
+    echo "  --chaincodeName        Optional: Chaincode name (default: asset)"
+    echo
+    echo -e "Example:"
+    echo "  $0 init-ledger --configFile ../generated_resources/network-config.yaml --orgName org1-admin-default --peerName org1-peer0.default --channelName demo"
+    echo "  $0 init-ledger --configFile ../generated_resources/network-config.yaml --orgName org1-admin-default --peerName org1-peer0.default --channelName demo --chaincodeName asset"
+    echo
+    echo -e "${YELLOW}get-all-files options:${NC}"
+    echo "  --configFile           Network config file (default: ../generated_resources/network-config.yaml)"
+    echo "  --orgName              Organization admin name (e.g., org1-admin-default)"
+    echo "  --peerName             Peer name (e.g., org1-peer0.default)"
+    echo "  --channelName          Channel name (e.g., demo)"
+    echo "  --chaincodeName        Optional: Chaincode name (default: asset)"
+    echo "  --args                 Optional: Query arguments as JSON array (default: [])"
+    echo
+    echo -e "Example:"
+    echo "  $0 get-all-files --configFile ../generated_resources/network-config.yaml --orgName org1-admin-default --peerName org1-peer0.default --channelName demo"
+    echo
+    echo -e "${YELLOW}create-file options:${NC}"
+    echo "  --configFile           Network config file (default: ../generated_resources/network-config.yaml)"
+    echo "  --orgName              Organization admin name (e.g., org1-admin-default)"
+    echo "  --peerName             Peer name (e.g., org1-peer0.default)"
+    echo "  --channelName          Channel name (e.g., demo)"
+    echo "  --chaincodeName        Optional: Chaincode name (default: asset)"
+    echo
+    echo "  Required File Parameters:"
+    echo "  --fileId               Unique file identifier"
+    echo "  --filename             Name of the file"
+    echo "  --ipfsCid              IPFS content identifier"
+    echo "  --size                 File size in bytes"
+    echo "  --allowedOrgsStr       Comma-separated list of allowed organizations (e.g., vikMSP,sunMSP)"
+    echo "                         Will be converted to JSON array format: [\"vikMSP\",\"sunMSP\"]"
+    echo
+    echo "  Optional File Parameters:"
+    echo "  --multiSigRequired     Whether multi-sig is required (default: false)"
+    echo "  --createdAt            ISO timestamp (optional, will auto-generate if not provided)"
+    echo "  --requiredOrgsStr      Comma-separated list of required orgs for multi-sig (e.g., vikMSP,sunMSP)"
+    echo "                         Will be converted to JSON array format: [\"vikMSP\",\"sunMSP\"]"
+    echo "  --metadata             Additional metadata as JSON object (default: {})"
+    echo
+    echo -e "Example (minimal):"
+    echo "  $0 create-file --configFile ../generated_resources/network-config.yaml \\"
+    echo "     --orgName vik-admin-default --peerName vik-peer0.default --channelName test \\"
+    echo "     --fileId file001 --filename document.pdf --ipfsCid QmX123abc \\"
+    echo "     --size 1024 --allowedOrgsStr vikMSP,sunMSP"
+    echo
+    echo -e "Example (with all options):"
+    echo "  $0 create-file --configFile ../generated_resources/network-config.yaml \\"
+    echo "     --orgName vik-admin-default --peerName vik-peer0.default --channelName test \\"
+    echo "     --fileId file002 --filename contract.pdf --ipfsCid QmY456def \\"
+    echo "     --size 2048 --allowedOrgsStr vikMSP,sunMSP,org3MSP \\"
+    echo "     --multiSigRequired true --requiredOrgsStr vikMSP,sunMSP \\"
+    echo "     --metadata '{\"type\":\"contract\",\"version\":\"1.0\",\"department\":\"legal\"}'"
+    echo
+    echo -e "${YELLOW}extra-user options:${NC}"
+    echo "  --username          Username for the blockchain identity (required)"
+    echo "  --orgName           Organization name (required, e.g., org, vik)"
+    echo "  --password          Password for enrollment (default: userpw)"
+    echo "  --namespace         Kubernetes namespace (default: default)"
+    echo
+    echo -e "Example:"
+    echo "  $0 extra-user --username john --orgName org"
+    echo "  $0 extra-user --username jane --orgName vik --password jane123"
     echo -e "${NC}"
     exit 1
 }
@@ -736,6 +811,339 @@ function commit_chaincode_wrapper() {
     echo -e "${GREEN}Your chaincode is now ready to use on channel: ${channelName}${NC}"
 }
 
+# Function to initialize ledger
+function init_ledger_wrapper() {
+    local configFile=$1
+    local orgName=$2
+    local peerName=$3
+    local channelName=$4
+    local chaincodeName=$5
+    
+    # Transform names to Kubernetes format
+    # orgName: org -> org-admin-default
+    # peerName: peer0 -> org-peer0.default
+    local fullOrgName="${orgName}-admin-default"
+    local fullPeerName="${orgName}-${peerName}.default"
+    
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}Initializing Ledger${NC}"
+    echo -e "${GREEN}Config File: ${configFile}${NC}"
+    echo -e "${GREEN}Organization: ${orgName} -> ${fullOrgName}${NC}"
+    echo -e "${GREEN}Peer: ${peerName} -> ${fullPeerName}${NC}"
+    echo -e "${GREEN}Channel: ${channelName}${NC}"
+    echo -e "${GREEN}Chaincode: ${chaincodeName}${NC}"
+    echo -e "${GREEN}========================================${NC}"
+    echo
+    
+    # Call chaincodeFunction.sh with transformed names
+    echo -e "${GREEN}Executing chaincode function...${NC}"
+    ./chaincodeFunction.sh --configFile "${configFile}" --orgName "${fullOrgName}" \
+        --peerName "${fullPeerName}" --channelName "${channelName}" \
+        --chaincode "${chaincodeName}" --fcn InitLedger
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Ledger initialized successfully${NC}"
+    else
+        echo -e "${RED}Failed to initialize ledger${NC}"
+        exit 1
+    fi
+    
+    echo
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}Ledger Initialization Complete!${NC}"
+    echo -e "${GREEN}========================================${NC}"
+}
+
+# Function to get all files from ledger
+function get_all_files_wrapper() {
+    local configFile=$1
+    local orgName=$2
+    local peerName=$3
+    local channelName=$4
+    local chaincodeName=$5
+    local args=$6
+    
+    # Transform names to Kubernetes format
+    local fullOrgName="${orgName}-admin-default"
+    local fullPeerName="${orgName}-${peerName}.default"
+    
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}Querying All Files${NC}"
+    echo -e "${GREEN}Config File: ${configFile}${NC}"
+    echo -e "${GREEN}Organization: ${orgName} -> ${fullOrgName}${NC}"
+    echo -e "${GREEN}Peer: ${peerName} -> ${fullPeerName}${NC}"
+    echo -e "${GREEN}Channel: ${channelName}${NC}"
+    echo -e "${GREEN}Chaincode: ${chaincodeName}${NC}"
+    if [ -n "$args" ]; then
+        echo -e "${GREEN}Arguments: ${args}${NC}"
+    fi
+    echo -e "${GREEN}========================================${NC}"
+    echo
+    
+    # Call chaincodeFunction.sh with transformed names
+    echo -e "${GREEN}Executing chaincode function...${NC}"
+    
+    if [ -n "$args" ]; then
+        ./chaincodeFunction.sh --configFile "${configFile}" --orgName "${fullOrgName}" \
+            --peerName "${fullPeerName}" --channelName "${channelName}" \
+            --chaincode "${chaincodeName}" --fcn GetAllFiles --args "${args}"
+    else
+        ./chaincodeFunction.sh --configFile "${configFile}" --orgName "${fullOrgName}" \
+            --peerName "${fullPeerName}" --channelName "${channelName}" \
+            --chaincode "${chaincodeName}" --fcn GetAllFiles
+    fi
+    
+    if [ $? -eq 0 ]; then
+        echo
+        echo -e "${GREEN}✓ Files retrieved successfully${NC}"
+    else
+        echo -e "${RED}Failed to retrieve files${NC}"
+        exit 1
+    fi
+    
+    echo
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}Query Complete!${NC}"
+    echo -e "${GREEN}========================================${NC}"
+}
+
+# Function to create a file in the ledger
+function create_file_wrapper() {
+    local configFile=$1
+    local orgName=$2
+    local peerName=$3
+    local channelName=$4
+    local chaincodeName=$5
+    local fileId=$6
+    local filename=$7
+    local ipfsCid=$8
+    local size=$9
+    local allowedOrgsStr=${10}
+    local multiSigRequired=${11}
+    local createdAt=${12}
+    local requiredOrgsStr=${13}
+    local metadata=${14}
+    
+    # Transform names to Kubernetes format
+    local fullOrgName="${orgName}-admin-default"
+    local fullPeerName="${orgName}-${peerName}.default"
+    
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}Creating File in Ledger${NC}"
+    echo -e "${GREEN}Config File: ${configFile}${NC}"
+    echo -e "${GREEN}Organization: ${orgName} -> ${fullOrgName}${NC}"
+    echo -e "${GREEN}Peer: ${peerName} -> ${fullPeerName}${NC}"
+    echo -e "${GREEN}Channel: ${channelName}${NC}"
+    echo -e "${GREEN}Chaincode: ${chaincodeName}${NC}"
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${BLUE}File Details:${NC}"
+    echo -e "${BLUE}  File ID:${NC}          ${fileId}"
+    echo -e "${BLUE}  Filename:${NC}         ${filename}"
+    echo -e "${BLUE}  IPFS CID:${NC}         ${ipfsCid}"
+    echo -e "${BLUE}  Size:${NC}             ${size} bytes"
+    echo -e "${BLUE}  Allowed Orgs:${NC}     ${allowedOrgsStr}"
+    echo -e "${BLUE}  Multi-Sig Req:${NC}    ${multiSigRequired}"
+    if [ -n "$createdAt" ]; then
+        echo -e "${BLUE}  Created At:${NC}       ${createdAt}"
+    fi
+    if [ -n "$requiredOrgsStr" ]; then
+        echo -e "${BLUE}  Required Orgs:${NC}    ${requiredOrgsStr}"
+    fi
+    if [ -n "$metadata" ]; then
+        echo -e "${BLUE}  Metadata:${NC}         ${metadata}"
+    fi
+    echo -e "${GREEN}========================================${NC}"
+    echo
+    
+    # Build command - don't use eval, call directly with proper quoting
+    echo -e "${GREEN}Executing chaincode function...${NC}"
+    
+    if [ -n "$metadata" ]; then
+        ./chaincodeFunction.sh --configFile "${configFile}" --orgName "${fullOrgName}" \
+            --peerName "${fullPeerName}" --channelName "${channelName}" \
+            --chaincode "${chaincodeName}" --fcn CreateFile \
+            --fileId "${fileId}" --filename "${filename}" \
+            --ipfsCid "${ipfsCid}" --size "${size}" \
+            --allowedOrgsStr "${allowedOrgsStr}" \
+            --multiSigRequired "${multiSigRequired}" \
+            --createdAt "${createdAt}" \
+            --requiredOrgsStr "${requiredOrgsStr}" \
+            --metadata "${metadata}"
+    else
+        ./chaincodeFunction.sh --configFile "${configFile}" --orgName "${fullOrgName}" \
+            --peerName "${fullPeerName}" --channelName "${channelName}" \
+            --chaincode "${chaincodeName}" --fcn CreateFile \
+            --fileId "${fileId}" --filename "${filename}" \
+            --ipfsCid "${ipfsCid}" --size "${size}" \
+            --allowedOrgsStr "${allowedOrgsStr}" \
+            --multiSigRequired "${multiSigRequired}" \
+            --createdAt "${createdAt}" \
+            --requiredOrgsStr "${requiredOrgsStr}"
+    fi
+    
+    if [ $? -eq 0 ]; then
+        echo
+        echo -e "${GREEN}✓ File created successfully${NC}"
+    else
+        echo -e "${RED}Failed to create file${NC}"
+        exit 1
+    fi
+    
+    echo
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}File Creation Complete!${NC}"
+    echo -e "${GREEN}========================================${NC}"
+}
+
+function propose_edit_wrapper() {
+    local configFile=$1
+    local orgName=$2
+    local peerName=$3
+    local channelName=$4
+    local chaincodeName=$5
+    local fileId=$6
+    local newContent=$7
+    local proposer=$8
+    
+    # Transform names to Kubernetes format
+    local fullOrgName="${orgName}-admin-default"
+    local fullPeerName="${orgName}-${peerName}.default"
+    
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}Proposing File Edit${NC}"
+    echo -e "${GREEN}Config File: ${configFile}${NC}"
+    echo -e "${GREEN}Organization: ${orgName} -> ${fullOrgName}${NC}"
+    echo -e "${GREEN}Peer: ${peerName} -> ${fullPeerName}${NC}"
+    echo -e "${GREEN}Channel: ${channelName}${NC}"
+    echo -e "${GREEN}Chaincode: ${chaincodeName}${NC}"
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${BLUE}Edit Proposal Details:${NC}"
+    echo -e "${BLUE}  File ID:${NC}          ${fileId}"
+    echo -e "${BLUE}  Proposer:${NC}         ${proposer}"
+    echo -e "${BLUE}  New Content Length:${NC} ${#newContent} chars"
+    echo -e "${GREEN}========================================${NC}"
+    echo
+    
+    echo -e "${GREEN}Executing chaincode function...${NC}"
+    ./chaincodeFunction.sh --configFile "${configFile}" --orgName "${fullOrgName}" \
+        --peerName "${fullPeerName}" --channelName "${channelName}" \
+        --chaincode "${chaincodeName}" --fcn UpdateFile \
+        --fileId "${fileId}" --ipfsCid "proposal-${fileId}" --size "0" --metadata "${newContent}"
+    
+    if [ $? -eq 0 ]; then
+        echo
+        echo -e "${GREEN}✓ Edit proposal created successfully (auto-approved by ${proposer})${NC}"
+    else
+        echo -e "${RED}Failed to create edit proposal${NC}"
+        exit 1
+    fi
+    
+    echo
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}Edit Proposal Complete!${NC}"
+    echo -e "${GREEN}========================================${NC}"
+}
+
+function approve_edit_wrapper() {
+    local configFile=$1
+    local orgName=$2
+    local peerName=$3
+    local channelName=$4
+    local chaincodeName=$5
+    local fileId=$6
+    local proposalId=$7
+    local approver=$8
+    
+    # Transform names to Kubernetes format
+    local fullOrgName="${orgName}-admin-default"
+    local fullPeerName="${orgName}-${peerName}.default"
+    
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}Approving File Edit${NC}"
+    echo -e "${GREEN}Config File: ${configFile}${NC}"
+    echo -e "${GREEN}Organization: ${orgName} -> ${fullOrgName}${NC}"
+    echo -e "${GREEN}Peer: ${peerName} -> ${fullPeerName}${NC}"
+    echo -e "${GREEN}Channel: ${channelName}${NC}"
+    echo -e "${GREEN}Chaincode: ${chaincodeName}${NC}"
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${BLUE}Approval Details:${NC}"
+    echo -e "${BLUE}  File ID:${NC}          ${fileId}"
+    echo -e "${BLUE}  Proposal ID:${NC}      ${proposalId}"
+    echo -e "${BLUE}  Approver:${NC}         ${approver}"
+    echo -e "${GREEN}========================================${NC}"
+    echo
+    
+    echo -e "${GREEN}Executing chaincode function...${NC}"
+    ./chaincodeFunction.sh --configFile "${configFile}" --orgName "${fullOrgName}" \
+        --peerName "${fullPeerName}" --channelName "${channelName}" \
+        --chaincode "${chaincodeName}" --fcn ApproveEdit \
+        --fileId "${fileId}" --proposalId "${proposalId}"
+    
+    if [ $? -eq 0 ]; then
+        echo
+        echo -e "${GREEN}✓ Approval recorded by ${approver}${NC}"
+    else
+        echo -e "${RED}Failed to approve edit proposal${NC}"
+        exit 1
+    fi
+    
+    echo
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}Edit Approval Complete!${NC}"
+    echo -e "${GREEN}========================================${NC}"
+}
+
+function reject_edit_wrapper() {
+    local configFile=$1
+    local orgName=$2
+    local peerName=$3
+    local channelName=$4
+    local chaincodeName=$5
+    local fileId=$6
+    local proposalId=$7
+    local rejector=$8
+    local reason=$9
+    
+    # Transform names to Kubernetes format
+    local fullOrgName="${orgName}-admin-default"
+    local fullPeerName="${orgName}-${peerName}.default"
+    
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}Rejecting File Edit${NC}"
+    echo -e "${GREEN}Config File: ${configFile}${NC}"
+    echo -e "${GREEN}Organization: ${orgName} -> ${fullOrgName}${NC}"
+    echo -e "${GREEN}Peer: ${peerName} -> ${fullPeerName}${NC}"
+    echo -e "${GREEN}Channel: ${channelName}${NC}"
+    echo -e "${GREEN}Chaincode: ${chaincodeName}${NC}"
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${BLUE}Rejection Details:${NC}"
+    echo -e "${BLUE}  File ID:${NC}          ${fileId}"
+    echo -e "${BLUE}  Proposal ID:${NC}      ${proposalId}"
+    echo -e "${BLUE}  Rejector:${NC}         ${rejector}"
+    echo -e "${BLUE}  Reason:${NC}           ${reason}"
+    echo -e "${GREEN}========================================${NC}"
+    echo
+    
+    echo -e "${GREEN}Executing chaincode function...${NC}"
+    ./chaincodeFunction.sh --configFile "${configFile}" --orgName "${fullOrgName}" \
+        --peerName "${fullPeerName}" --channelName "${channelName}" \
+        --chaincode "${chaincodeName}" --fcn RejectEdit \
+        --fileId "${fileId}"
+    
+    if [ $? -eq 0 ]; then
+        echo
+        echo -e "${GREEN}✓ Edit proposal rejected successfully${NC}"
+    else
+        echo -e "${RED}Failed to reject edit proposal${NC}"
+        exit 1
+    fi
+    
+    echo
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}Edit Rejection Complete!${NC}"
+    echo -e "${GREEN}========================================${NC}"
+}
+
 # Main script logic
 subcommand=$1
 orgName=""
@@ -758,6 +1166,16 @@ imageName=""
 configFile=""
 version=""
 sequence=""
+peerName=""
+args=""
+fileId=""
+filename=""
+ipfsCid=""
+size=""
+allowedOrgsStr=""
+multiSigRequired=""
+requiredOrgsStr=""
+metadata=""
 
 if [ "$subcommand" == "help" ]; then
     show_help
@@ -1080,6 +1498,256 @@ elif [ "$subcommand" == "commit-chaincode" ]; then
     fi
     
     commit_chaincode_wrapper "$chaincodeName" "$version" "$sequence" "$channelName" "$orgName" "$configFile"
+
+elif [ "$subcommand" == "init-ledger" ]; then
+    shift
+    if [ $# -eq 0 ]; then
+        echo -e "${YELLOW}No options provided. Please provide the required options.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    # Set defaults
+    configFile="../generated_resources/network-config.yaml"
+    chaincodeName="asset"
+    
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            --configFile) configFile="$2"; shift ;;
+            --orgName) orgName="$2"; shift ;;
+            --peerName) peerName="$2"; shift ;;
+            --channelName) channelName="$2"; shift ;;
+            --chaincodeName) chaincodeName="$2"; shift ;;
+            *) echo -e "${RED}Unknown parameter passed: $1${NC}"; show_help; exit 1 ;;
+        esac
+        shift
+    done
+    
+    if [ -z "$orgName" ] || [ -z "$peerName" ] || [ -z "$channelName" ]; then
+        echo -e "${RED}Missing required options. Please provide --orgName, --peerName, and --channelName.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    init_ledger_wrapper "$configFile" "$orgName" "$peerName" "$channelName" "$chaincodeName"
+
+elif [ "$subcommand" == "get-all-files" ]; then
+    shift
+    if [ $# -eq 0 ]; then
+        echo -e "${YELLOW}No options provided. Please provide the required options.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    # Set defaults
+    configFile="../generated_resources/network-config.yaml"
+    chaincodeName="asset"
+    args=""
+    
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            --configFile) configFile="$2"; shift ;;
+            --orgName) orgName="$2"; shift ;;
+            --peerName) peerName="$2"; shift ;;
+            --channelName) channelName="$2"; shift ;;
+            --chaincodeName) chaincodeName="$2"; shift ;;
+            --args) args="$2"; shift ;;
+            *) echo -e "${RED}Unknown parameter passed: $1${NC}"; show_help; exit 1 ;;
+        esac
+        shift
+    done
+    
+    if [ -z "$orgName" ] || [ -z "$peerName" ] || [ -z "$channelName" ]; then
+        echo -e "${RED}Missing required options. Please provide --orgName, --peerName, and --channelName.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    get_all_files_wrapper "$configFile" "$orgName" "$peerName" "$channelName" "$chaincodeName" "$args"
+
+elif [ "$subcommand" == "create-file" ]; then
+    shift
+    if [ $# -eq 0 ]; then
+        echo -e "${YELLOW}No options provided. Please provide the required options.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    # Set defaults
+    configFile="../generated_resources/network-config.yaml"
+    chaincodeName="asset"
+    multiSigRequired="false"
+    createdAt=""
+    requiredOrgsStr=""
+    metadata="{}"
+    
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            --configFile) configFile="$2"; shift ;;
+            --orgName) orgName="$2"; shift ;;
+            --peerName) peerName="$2"; shift ;;
+            --channelName) channelName="$2"; shift ;;
+            --chaincodeName) chaincodeName="$2"; shift ;;
+            --fileId) fileId="$2"; shift ;;
+            --filename) filename="$2"; shift ;;
+            --ipfsCid) ipfsCid="$2"; shift ;;
+            --size) size="$2"; shift ;;
+            --allowedOrgsStr) allowedOrgsStr="$2"; shift ;;
+            --multiSigRequired) multiSigRequired="$2"; shift ;;
+            --createdAt) createdAt="$2"; shift ;;
+            --requiredOrgsStr) requiredOrgsStr="$2"; shift ;;
+            --metadata) metadata="$2"; shift ;;
+            *) echo -e "${RED}Unknown parameter passed: $1${NC}"; show_help; exit 1 ;;
+        esac
+        shift
+    done
+    
+    if [ -z "$orgName" ] || [ -z "$peerName" ] || [ -z "$channelName" ] || [ -z "$fileId" ] || [ -z "$filename" ] || [ -z "$ipfsCid" ] || [ -z "$size" ] || [ -z "$allowedOrgsStr" ]; then
+        echo -e "${RED}Missing required options. Please provide --orgName, --peerName, --channelName, --fileId, --filename, --ipfsCid, --size, and --allowedOrgsStr.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    create_file_wrapper "$configFile" "$orgName" "$peerName" "$channelName" "$chaincodeName" "$fileId" "$filename" "$ipfsCid" "$size" "$allowedOrgsStr" "$multiSigRequired" "$createdAt" "$requiredOrgsStr" "$metadata"
+
+elif [ "$subcommand" == "propose-edit" ]; then
+    shift
+    if [ $# -eq 0 ]; then
+        echo -e "${YELLOW}No options provided. Please provide the required options.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    # Set defaults
+    configFile="../generated_resources/network-config.yaml"
+    chaincodeName="asset"
+    
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            --configFile) configFile="$2"; shift ;;
+            --orgName) orgName="$2"; shift ;;
+            --peerName) peerName="$2"; shift ;;
+            --channelName) channelName="$2"; shift ;;
+            --chaincodeName) chaincodeName="$2"; shift ;;
+            --fileId) fileId="$2"; shift ;;
+            --newContent) newContent="$2"; shift ;;
+            --proposer) proposer="$2"; shift ;;
+            *) echo -e "${RED}Unknown parameter passed: $1${NC}"; show_help; exit 1 ;;
+        esac
+        shift
+    done
+    
+    if [ -z "$orgName" ] || [ -z "$peerName" ] || [ -z "$channelName" ] || [ -z "$fileId" ] || [ -z "$newContent" ] || [ -z "$proposer" ]; then
+        echo -e "${RED}Missing required options. Please provide --orgName, --peerName, --channelName, --fileId, --newContent, and --proposer.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    propose_edit_wrapper "$configFile" "$orgName" "$peerName" "$channelName" "$chaincodeName" "$fileId" "$newContent" "$proposer"
+
+elif [ "$subcommand" == "approve-edit" ]; then
+    shift
+    if [ $# -eq 0 ]; then
+        echo -e "${YELLOW}No options provided. Please provide the required options.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    # Set defaults
+    configFile="../generated_resources/network-config.yaml"
+    chaincodeName="asset"
+    
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            --configFile) configFile="$2"; shift ;;
+            --orgName) orgName="$2"; shift ;;
+            --peerName) peerName="$2"; shift ;;
+            --channelName) channelName="$2"; shift ;;
+            --chaincodeName) chaincodeName="$2"; shift ;;
+            --fileId) fileId="$2"; shift ;;
+            --proposalId) proposalId="$2"; shift ;;
+            --approver) approver="$2"; shift ;;
+            *) echo -e "${RED}Unknown parameter passed: $1${NC}"; show_help; exit 1 ;;
+        esac
+        shift
+    done
+    
+    if [ -z "$orgName" ] || [ -z "$peerName" ] || [ -z "$channelName" ] || [ -z "$fileId" ] || [ -z "$proposalId" ] || [ -z "$approver" ]; then
+        echo -e "${RED}Missing required options. Please provide --orgName, --peerName, --channelName, --fileId, --proposalId, and --approver.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    approve_edit_wrapper "$configFile" "$orgName" "$peerName" "$channelName" "$chaincodeName" "$fileId" "$proposalId" "$approver"
+
+elif [ "$subcommand" == "reject-edit" ]; then
+    shift
+    if [ $# -eq 0 ]; then
+        echo -e "${YELLOW}No options provided. Please provide the required options.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    # Set defaults
+    configFile="../generated_resources/network-config.yaml"
+    chaincodeName="asset"
+    reason="No reason provided"
+    
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            --configFile) configFile="$2"; shift ;;
+            --orgName) orgName="$2"; shift ;;
+            --peerName) peerName="$2"; shift ;;
+            --channelName) channelName="$2"; shift ;;
+            --chaincodeName) chaincodeName="$2"; shift ;;
+            --fileId) fileId="$2"; shift ;;
+            --proposalId) proposalId="$2"; shift ;;
+            --rejector) rejector="$2"; shift ;;
+            --reason) reason="$2"; shift ;;
+            *) echo -e "${RED}Unknown parameter passed: $1${NC}"; show_help; exit 1 ;;
+        esac
+        shift
+    done
+    
+    if [ -z "$orgName" ] || [ -z "$peerName" ] || [ -z "$channelName" ] || [ -z "$fileId" ] || [ -z "$proposalId" ] || [ -z "$rejector" ]; then
+        echo -e "${RED}Missing required options. Please provide --orgName, --peerName, --channelName, --fileId, --proposalId, and --rejector.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    reject_edit_wrapper "$configFile" "$orgName" "$peerName" "$channelName" "$chaincodeName" "$fileId" "$proposalId" "$rejector" "$reason"
+
+elif [ "$subcommand" == "extra-user" ]; then
+    shift
+    if [ $# -eq 0 ]; then
+        echo -e "${YELLOW}No options provided. Please provide the required options.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    # Set defaults
+    password="userpw"
+    namespace="default"
+    
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            --username) username="$2"; shift ;;
+            --orgName) orgName="$2"; shift ;;
+            --password) password="$2"; shift ;;
+            --namespace) namespace="$2"; shift ;;
+            *) echo -e "${RED}Unknown parameter passed: $1${NC}"; show_help; exit 1 ;;
+        esac
+        shift
+    done
+    
+    if [ -z "$username" ] || [ -z "$orgName" ]; then
+        echo -e "${RED}Missing required options. Please provide --username and --orgName.${NC}"
+        show_help
+        exit 1
+    fi
+    
+    # Call extraUser.sh script
+    ./extraUser.sh --username "$username" --orgName "$orgName" --password "$password" --namespace "$namespace"
 
 else
     echo -e "${RED}Unknown command: $subcommand${NC}"
